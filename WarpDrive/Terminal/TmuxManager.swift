@@ -10,6 +10,7 @@ public class TmuxManager: ObservableObject {
     
     private var sshClient: SSHClient?
     private var cancellables = Set<AnyCancellable>()
+    private var tmuxPath: String = "tmux"
     
     public init() {
         logInfo("TmuxManager initialized", category: .tmux)
@@ -43,16 +44,30 @@ public class TmuxManager: ObservableObject {
             throw TmuxError.commandFailed("Not connected to SSH")
         }
         
-        // Check if tmux is installed
-        do {
-            _ = try await client.execute(command: "which tmux")
-        } catch {
+        // Check if tmux is installed - try common paths
+        let tmuxPaths = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux", "tmux"]
+        var foundPath: String?
+        
+        for path in tmuxPaths {
+            do {
+                _ = try await client.execute(command: "\(path) -V 2>/dev/null")
+                foundPath = path
+                logInfo("Found tmux at: \(path)", category: .tmux)
+                break
+            } catch {
+                continue
+            }
+        }
+        
+        guard let tmuxPath = foundPath else {
             logError("tmux not found on remote host", category: .tmux)
             throw TmuxError.notInstalled
         }
         
+        self.tmuxPath = tmuxPath
+        
         // List sessions with format
-        let output = try await client.execute(command: "tmux list-sessions -F '#{session_name}|#{session_created}|#{session_attached}|#{session_windows}' 2>/dev/null || echo ''")
+        let output = try await client.execute(command: "\(tmuxPath) list-sessions -F '#{session_name}|#{session_created}|#{session_attached}|#{session_windows}' 2>/dev/null || echo ''")
         
         logDebug("tmux list-sessions output: \(output)", category: .tmux)
         
@@ -72,7 +87,7 @@ public class TmuxManager: ObservableObject {
         }
         
         // Create detached session
-        _ = try await client.execute(command: "tmux new-session -d -s '\(name)'")
+        _ = try await client.execute(command: "\(tmuxPath) new-session -d -s '\(name)'")
         
         let session = TmuxSession(id: name, name: name, created: Date(), attached: false, windows: 1)
         
@@ -101,7 +116,7 @@ public class TmuxManager: ObservableObject {
         
         // Note: For now, we'll just verify the session exists
         // Full control mode implementation will come in the interactive terminal
-        _ = try await client.execute(command: "tmux has-session -t '\(session.name)'")
+        _ = try await client.execute(command: "\(tmuxPath) has-session -t '\(session.name)'")
         
         logInfo("Successfully attached to session: \(session.name)", category: .tmux)
     }
@@ -118,7 +133,7 @@ public class TmuxManager: ObservableObject {
             throw TmuxError.commandFailed("Not connected to SSH")
         }
         
-        _ = try await client.execute(command: "tmux detach-client")
+        _ = try await client.execute(command: "\(tmuxPath) detach-client")
         currentSession = nil
         
         logInfo("Detached from session", category: .tmux)
@@ -132,7 +147,7 @@ public class TmuxManager: ObservableObject {
             throw TmuxError.commandFailed("Not connected to SSH")
         }
         
-        _ = try await client.execute(command: "tmux kill-session -t '\(session.name)'")
+        _ = try await client.execute(command: "\(tmuxPath) kill-session -t '\(session.name)'")
         
         // Refresh session list
         _ = try await listSessions()
@@ -161,7 +176,7 @@ public class TmuxManager: ObservableObject {
         // Escape single quotes in the keys
         let escapedKeys = keys.replacingOccurrences(of: "'", with: "'\\''")
         
-        _ = try await client.execute(command: "tmux send-keys -t '\(session.name)' '\(escapedKeys)'")
+        _ = try await client.execute(command: "\(tmuxPath) send-keys -t '\(session.name)' '\(escapedKeys)'")
     }
     
     /// Capture pane output from a session
@@ -172,7 +187,7 @@ public class TmuxManager: ObservableObject {
         
         logDebug("Capturing pane output from session: \(session.name)", category: .tmux)
         
-        let output = try await client.execute(command: "tmux capture-pane -t '\(session.name)' -p -S -\(lines)")
+        let output = try await client.execute(command: "\(tmuxPath) capture-pane -t '\(session.name)' -p -S -\(lines)")
         
         return output
     }

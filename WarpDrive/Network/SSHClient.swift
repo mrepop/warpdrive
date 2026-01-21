@@ -150,13 +150,20 @@ public class SSHClient: ObservableObject {
                 let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
                 let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
                 
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+                
                 if process.terminationStatus == 0 {
-                    let output = String(data: outputData, encoding: .utf8) ?? ""
                     continuation.resume(returning: output)
                 } else {
-                    let error = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-                    logError("SSH command failed: \(error)", category: .ssh)
-                    continuation.resume(throwing: SSHError.commandExecutionFailed(error))
+                    // Ignore known_hosts warnings
+                    if errorOutput.contains("Permanently added") || errorOutput.contains("Warning:") {
+                        logDebug("SSH warning (ignored): \(errorOutput)", category: .ssh)
+                        continuation.resume(returning: output)
+                    } else {
+                        logError("SSH command failed: \(errorOutput)", category: .ssh)
+                        continuation.resume(throwing: SSHError.commandExecutionFailed(errorOutput))
+                    }
                 }
             } catch {
                 logError("Failed to execute SSH command: \(error)", category: .ssh)
