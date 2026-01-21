@@ -4,12 +4,13 @@ import PackageDescription
 let package = Package(
     name: "WarpDrive",
     platforms: [
-        .iOS(.v17)
+        .iOS(.v17),
+        .macOS(.v13)
     ],
     products: [
         .library(
-            name: "WarpDrive",
-            targets: ["WarpDrive"]
+            name: "WarpDriveCore",
+            targets: ["WarpDriveCore"]
         )
     ],
     dependencies: [
@@ -21,18 +22,19 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "WarpDrive",
+            name: "WarpDriveCore",
             dependencies: [
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
                 .product(name: "NIOSSH", package: "swift-nio-ssh"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
             ],
-            path: "WarpDrive"
+            path: "WarpDrive",
+            exclude: ["App", "Info.plist", "Resources"]
         ),
         .testTarget(
             name: "WarpDriveTests",
-            dependencies: ["WarpDrive"],
+            dependencies: ["WarpDriveCore"],
             path: "WarpDriveTests"
         )
     ]

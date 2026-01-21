@@ -121,7 +121,7 @@ public class SSHClient: ObservableObject {
             
             // Add authentication
             switch config.credentials.authMethod {
-            case .password(let password):
+            case .password(_):
                 // Note: ssh doesn't accept password via command line
                 // For testing, we'll assume key-based auth is set up
                 logWarning("Password auth not supported in current implementation", category: .ssh)

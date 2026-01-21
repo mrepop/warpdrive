@@ -1,5 +1,5 @@
 import XCTest
-@testable import WarpDrive
+@testable import WarpDriveCore
 
 final class SessionManagerTests: XCTestCase {
     var sessionManager: SessionManager!
