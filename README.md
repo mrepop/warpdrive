@@ -7,12 +7,12 @@ An iOS application for controlling and monitoring Warp console sessions from you
 **Phase 1 Complete!** 🎉
 
 WarpDrive now supports:
-- ✅ SSH connection to remote servers
-- ✅ tmux session listing and management
-- ✅ Terminal output viewing
-- ✅ Command execution in sessions
-- ✅ Session creation and deletion
-- ✅ Full diagnostic logging
+- SSH connection to remote servers
+- tmux session listing and management
+- Terminal output viewing
+- Command execution in sessions
+- Session creation and deletion
+- Full diagnostic logging
 
 ## Quick Start
 
