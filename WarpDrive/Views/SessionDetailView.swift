@@ -12,10 +12,8 @@ struct SessionDetailView: View {
     @State private var isLoading = false
     @State private var autoRefreshTimer: Timer?
     @State private var showKeyboardAccessory = false
-    @State private var textInput: String = ""
     @ObservedObject var settings = TerminalSettings.shared
     @Environment(\.dismiss) private var dismiss
-    @FocusState private var isKeyboardFocused: Bool
     
     var body: some View {
         ZStack {
@@ -24,26 +22,10 @@ struct SessionDetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
                 .edgesIgnoringSafeArea(.all)
-                .onTapGesture {
-                    // Tap terminal to show keyboard
-                    isKeyboardFocused = true
-                }
             
             #if os(iOS)
-            // Hidden TextField to trigger iOS keyboard and capture input
-            TextField("", text: $textInput)
-                .frame(width: 0, height: 0)
-                .opacity(0)
-                .focused($isKeyboardFocused)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(.asciiCapable)
-                .onChange(of: textInput) { oldValue, newValue in
-                    handleTextInput(oldValue: oldValue, newValue: newValue)
-                }
-            
             // Keyboard accessory overlay (conditionally shown)
-            if showKeyboardAccessory && (!settings.keyboardAutoHide || showKeyboardAccessory) {
+            if showKeyboardAccessory {
                 VStack {
                     Spacer()
                     TerminalKeyboardAccessory { key in
@@ -107,10 +89,6 @@ struct SessionDetailView: View {
             }
         }
         .navigationBarHidden(true)
-            .onAppear {
-                // Auto-focus to show keyboard
-                isKeyboardFocused = true
-            }
             .task {
                 // Wait for terminal controller to be initialized
                 var attempts = 0
@@ -157,56 +135,6 @@ struct SessionDetailView: View {
     private func refreshOutput() {
         Task {
             await loadOutput()
-        }
-    }
-    
-    private func handleTextInput(oldValue: String, newValue: String) {
-        // Handle character input and echo to terminal
-        if newValue.count > oldValue.count {
-            // New characters added
-            let diff = String(newValue.suffix(newValue.count - oldValue.count))
-            
-            // Echo locally for immediate feedback
-            terminalController?.feed(text: diff)
-            
-            // Send to tmux session
-            Task {
-                do {
-                    try await tmuxManager.sendKeys(diff, session: session)
-                    
-                    // Check if Enter was pressed (newline character)
-                    if diff.contains("\n") {
-                        // Refresh after command execution
-                        try await Task.sleep(nanoseconds: 200_000_000)
-                        await loadOutput()
-                        
-                        // Clear text input after Enter
-                        await MainActor.run {
-                            textInput = ""
-                        }
-                    }
-                } catch {
-                    await MainActor.run {
-                        terminalController?.feed(text: "\nError: \(error.localizedDescription)\n")
-                    }
-                }
-            }
-        } else if newValue.count < oldValue.count {
-            // Backspace - handle deletion
-            let deleteCount = oldValue.count - newValue.count
-            for _ in 0..<deleteCount {
-                // Echo backspace locally
-                terminalController?.feed(text: "\u{08} \u{08}")
-                
-                // Send backspace to tmux
-                Task {
-                    do {
-                        try await tmuxManager.sendKeys("BSpace", session: session)
-                    } catch {
-                        print("Error sending backspace: \(error)")
-                    }
-                }
-            }
         }
     }
     

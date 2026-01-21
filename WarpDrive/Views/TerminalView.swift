@@ -65,6 +65,15 @@ struct TerminalView: UIViewRepresentable {
         let termView = NativeTerminalView(frame: .zero, font: font)
         termView.nativeForegroundColor = .white
         termView.nativeBackgroundColor = .black
+        
+        // Disable SwiftTerm's built-in accessory view to show standard iOS keyboard
+        termView.inputAccessoryView = nil
+        
+        // Make terminal view first responder to show iOS keyboard
+        DispatchQueue.main.async {
+            termView.becomeFirstResponder()
+        }
+        
         print("🖥️ TerminalView created, bounds: \(termView.bounds)")
         
         // Create controller
