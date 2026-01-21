@@ -9,7 +9,7 @@ struct SessionListView: View {
     @State private var newSessionName = ""
     @State private var errorMessage: String?
     @State private var selectedSession: TmuxSession?
-    @State private var showingSessionTabs = false
+    @State private var showingSettings = false
     
     var body: some View {
         List {
@@ -49,14 +49,7 @@ struct SessionListView: View {
                     ForEach(tmuxManager.sessions) { session in
                         SessionRow(session: session)
                             .onTapGesture {
-                                #if os(iOS)
-                                // On iOS, open in tab view for multiple sessions
                                 selectedSession = session
-                                showingSessionTabs = true
-                                #else
-                                // On macOS, open in sheet
-                                selectedSession = session
-                                #endif
                             }
                     }
                 }
@@ -88,6 +81,14 @@ struct SessionListView: View {
                 }
                 .disabled(isLoading)
             }
+            
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Label("Settings", systemImage: "gear")
+                }
+            }
         }
         .task {
             await refreshSessions()
@@ -102,30 +103,18 @@ struct SessionListView: View {
         } message: {
             Text("Enter a name for the new tmux session")
         }
-        #if os(iOS)
-        .fullScreenCover(isPresented: $showingSessionTabs) {
-            if let session = selectedSession {
-                NavigationStack {
-                    SessionTabView(tmuxManager: tmuxManager)
-                        .onAppear {
-                            // TODO: Open the selected session in tab view
-                        }
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Done") {
-                                    showingSessionTabs = false
-                                    selectedSession = nil
-                                }
-                            }
-                        }
-                }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
+        .fullScreenCover(item: $selectedSession) { session in
+            NavigationStack {
+                #if os(iOS)
+                SessionTabView(tmuxManager: tmuxManager, initialSession: session)
+                #else
+                SessionDetailView(session: session, tmuxManager: tmuxManager)
+                #endif
             }
         }
-        #else
-        .sheet(item: $selectedSession) { session in
-            SessionDetailView(session: session, tmuxManager: tmuxManager)
-        }
-        #endif
     }
     
     @MainActor

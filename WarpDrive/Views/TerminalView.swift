@@ -55,10 +55,14 @@ class TerminalViewController: ObservableObject {
 /// SwiftUI wrapper for SwiftTerm's TerminalView on iOS
 struct TerminalView: UIViewRepresentable {
     @Binding var terminalController: TerminalViewController?
+    @ObservedObject var settings = TerminalSettings.shared
     
     func makeUIView(context: Context) -> NativeTerminalView {
-        print("🖥️ Creating TerminalView with frame: .zero")
-        let termView = NativeTerminalView(frame: .zero)
+        print("🖥️ Creating TerminalView with frame: .zero, fontSize: \(settings.fontSize)")
+        
+        // Create terminal with custom font size
+        let font = UIFont.monospacedSystemFont(ofSize: settings.fontSize, weight: .regular)
+        let termView = NativeTerminalView(frame: .zero, font: font)
         termView.nativeForegroundColor = .white
         termView.nativeBackgroundColor = .black
         print("🖥️ TerminalView created, bounds: \(termView.bounds)")
@@ -79,6 +83,15 @@ struct TerminalView: UIViewRepresentable {
     func updateUIView(_ uiView: NativeTerminalView, context: Context) {
         // Update display when size changes
         print("🖥️ updateUIView called, bounds: \(uiView.bounds)")
+        
+        // Update font if settings changed
+        let currentFontSize = uiView.font.pointSize
+        if abs(currentFontSize - settings.fontSize) > 0.1 {
+            print("🖥️ Updating font size from \(currentFontSize) to \(settings.fontSize)")
+            let newFont = UIFont.monospacedSystemFont(ofSize: settings.fontSize, weight: .regular)
+            uiView.font = newFont
+        }
+        
         if uiView.bounds.size != .zero {
             print("🖥️ Triggering display update")
             uiView.setNeedsDisplay()

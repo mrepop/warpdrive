@@ -16,6 +16,7 @@ WarpDrive now supports:
 - Immediate character echo for responsive typing
 - Optimized terminal refresh (300ms) for better usability
 - No auto-capitalization on iOS keyboard
+- Customizable terminal font size (8-24pt)
 
 ## Quick Start
 
@@ -52,6 +53,7 @@ open Package.swift  # Opens in Xcode
 - Copy/paste support
 - Multiple session tabs
 - iOS keyboard optimized for terminal (no auto-capitalization)
+- Customizable terminal font size (8-24pt, default 10pt for phones)
 - Comprehensive error handling and diagnostic logging
 - Cross-platform (iOS & macOS)
 
