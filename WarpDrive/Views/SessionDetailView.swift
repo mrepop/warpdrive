@@ -4,25 +4,31 @@ struct SessionDetailView: View {
     let session: TmuxSession
     @ObservedObject var tmuxManager: TmuxManager
     
-    @State private var output: String = ""
+    @State private var terminalController: TerminalViewController?
     @State private var command: String = ""
     @State private var isLoading = false
+    @State private var autoRefreshTimer: Timer?
     @Environment(\.dismiss) private var dismiss
+    
+    #if os(iOS)
+    @FocusState private var isInputFocused: Bool
+    #endif
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Terminal output area
-                ScrollView {
-                    Text(output.isEmpty ? "Loading..." : output)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                }
-                .background(Color.black)
-                .foregroundColor(.green)
+                // Terminal view with SwiftTerm
+                TerminalView(terminalController: $terminalController)
+                    .background(Color.black)
                 
                 Divider()
+                
+                #if os(iOS)
+                // Custom keyboard accessory for iOS
+                TerminalKeyboardAccessory { key in
+                    handleTerminalKey(key)
+                }
+                #endif
                 
                 // Command input area
                 HStack {
@@ -30,12 +36,29 @@ struct SessionDetailView: View {
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
                         .onSubmit(sendCommand)
+                        #if os(iOS)
+                        .focused($isInputFocused)
+                        #endif
                     
                     Button(action: sendCommand) {
                         Image(systemName: "paperplane.fill")
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(command.isEmpty || isLoading)
+                    
+                    #if os(iOS)
+                    // Copy button
+                    Button(action: copySelectedText) {
+                        Image(systemName: "doc.on.clipboard")
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    // Paste button
+                    Button(action: pasteText) {
+                        Image(systemName: "doc.on.clipboard.fill")
+                    }
+                    .buttonStyle(.bordered)
+                    #endif
                 }
                 .padding()
                 #if os(macOS)
@@ -48,6 +71,7 @@ struct SessionDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
+                        stopAutoRefresh()
                         dismiss()
                     }
                 }
@@ -58,8 +82,12 @@ struct SessionDetailView: View {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
                         
+                        Button(action: clearTerminal) {
+                            Label("Clear", systemImage: "trash")
+                        }
+                        
                         Button(role: .destructive, action: killSession) {
-                            Label("Kill Session", systemImage: "trash")
+                            Label("Kill Session", systemImage: "xmark.circle")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -68,6 +96,7 @@ struct SessionDetailView: View {
             }
             .task {
                 await loadOutput()
+                startAutoRefresh()
             }
         }
     }
@@ -78,11 +107,12 @@ struct SessionDetailView: View {
         do {
             let captured = try await tmuxManager.capturePaneOutput(session: session, lines: 100)
             await MainActor.run {
-                output = captured
+                terminalController?.clear()
+                terminalController?.feed(text: captured)
             }
         } catch {
             await MainActor.run {
-                output = "Error: \(error.localizedDescription)"
+                terminalController?.feed(text: "Error: \(error.localizedDescription)\n")
             }
         }
         
@@ -116,7 +146,7 @@ struct SessionDetailView: View {
                 await loadOutput()
             } catch {
                 await MainActor.run {
-                    output += "\nError: \(error.localizedDescription)"
+                    terminalController?.feed(text: "\nError: \(error.localizedDescription)\n")
                 }
             }
         }
@@ -127,14 +157,82 @@ struct SessionDetailView: View {
             do {
                 try await tmuxManager.killSession(session)
                 await MainActor.run {
+                    stopAutoRefresh()
                     dismiss()
                 }
             } catch {
                 await MainActor.run {
-                    output += "\nError killing session: \(error.localizedDescription)"
+                    terminalController?.feed(text: "\nError killing session: \(error.localizedDescription)\n")
                 }
             }
         }
+    }
+    
+    #if os(iOS)
+    private func handleTerminalKey(_ key: TerminalKey) {
+        let sequence = key.escapeSequence
+        guard !sequence.isEmpty else { return }
+        
+        Task {
+            do {
+                try await tmuxManager.sendKeys(sequence, session: session)
+                
+                // Refresh after a short delay
+                try await Task.sleep(nanoseconds: 100_000_000)
+                await loadOutput()
+            } catch {
+                await MainActor.run {
+                    terminalController?.feed(text: "\nError: \(error.localizedDescription)\n")
+                }
+            }
+        }
+    }
+    
+    private func copySelectedText() {
+        guard let selectedText = terminalController?.getSelectedText(), !selectedText.isEmpty else {
+            return
+        }
+        
+        UIPasteboard.general.string = selectedText
+    }
+    
+    private func pasteText() {
+        guard let text = UIPasteboard.general.string, !text.isEmpty else {
+            return
+        }
+        
+        Task {
+            do {
+                try await tmuxManager.sendKeys(text, session: session)
+                
+                // Refresh after paste
+                try await Task.sleep(nanoseconds: 100_000_000)
+                await loadOutput()
+            } catch {
+                await MainActor.run {
+                    terminalController?.feed(text: "\nError: \(error.localizedDescription)\n")
+                }
+            }
+        }
+    }
+    #endif
+    
+    private func clearTerminal() {
+        terminalController?.clear()
+    }
+    
+    private func startAutoRefresh() {
+        // Auto-refresh terminal output every 2 seconds
+        autoRefreshTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            Task {
+                await loadOutput()
+            }
+        }
+    }
+    
+    private func stopAutoRefresh() {
+        autoRefreshTimer?.invalidate()
+        autoRefreshTimer = nil
     }
 }
 
