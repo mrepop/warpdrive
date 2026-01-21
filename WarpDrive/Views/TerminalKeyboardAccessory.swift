@@ -1,5 +1,72 @@
 import SwiftUI
 
+/// Terminal key types
+enum TerminalKey {
+    case escape
+    case tab
+    case control
+    case alt
+    case arrowUp
+    case arrowDown
+    case arrowLeft
+    case arrowRight
+    case home
+    case end
+    case pageUp
+    case pageDown
+    case function(Int)
+    
+    /// Convert to ANSI escape sequence
+    var escapeSequence: String {
+        switch self {
+        case .escape:
+            return "\u{1B}"
+        case .tab:
+            return "\t"
+        case .control:
+            // Ctrl key is a modifier, not a standalone key
+            // Return empty for now, handle with modifier logic
+            return ""
+        case .alt:
+            // Alt key is a modifier
+            return ""
+        case .arrowUp:
+            return "\u{1B}[A"
+        case .arrowDown:
+            return "\u{1B}[B"
+        case .arrowRight:
+            return "\u{1B}[C"
+        case .arrowLeft:
+            return "\u{1B}[D"
+        case .home:
+            return "\u{1B}[H"
+        case .end:
+            return "\u{1B}[F"
+        case .pageUp:
+            return "\u{1B}[5~"
+        case .pageDown:
+            return "\u{1B}[6~"
+        case .function(let num):
+            // F1-F12 escape sequences
+            switch num {
+            case 1: return "\u{1B}OP"
+            case 2: return "\u{1B}OQ"
+            case 3: return "\u{1B}OR"
+            case 4: return "\u{1B}OS"
+            case 5: return "\u{1B}[15~"
+            case 6: return "\u{1B}[17~"
+            case 7: return "\u{1B}[18~"
+            case 8: return "\u{1B}[19~"
+            case 9: return "\u{1B}[20~"
+            case 10: return "\u{1B}[21~"
+            case 11: return "\u{1B}[23~"
+            case 12: return "\u{1B}[24~"
+            default: return ""
+            }
+        }
+    }
+}
+
 #if os(iOS)
 /// Custom keyboard accessory view with terminal-specific keys
 struct TerminalKeyboardAccessory: View {
@@ -116,73 +183,6 @@ private struct KeyButton: View {
                 .frame(width: width, height: 32)
                 .background(Color(.systemGray4))
                 .cornerRadius(6)
-        }
-    }
-}
-
-/// Terminal key types
-enum TerminalKey {
-    case escape
-    case tab
-    case control
-    case alt
-    case arrowUp
-    case arrowDown
-    case arrowLeft
-    case arrowRight
-    case home
-    case end
-    case pageUp
-    case pageDown
-    case function(Int)
-    
-    /// Convert to ANSI escape sequence
-    var escapeSequence: String {
-        switch self {
-        case .escape:
-            return "\u{1B}"
-        case .tab:
-            return "\t"
-        case .control:
-            // Ctrl key is a modifier, not a standalone key
-            // Return empty for now, handle with modifier logic
-            return ""
-        case .alt:
-            // Alt key is a modifier
-            return ""
-        case .arrowUp:
-            return "\u{1B}[A"
-        case .arrowDown:
-            return "\u{1B}[B"
-        case .arrowRight:
-            return "\u{1B}[C"
-        case .arrowLeft:
-            return "\u{1B}[D"
-        case .home:
-            return "\u{1B}[H"
-        case .end:
-            return "\u{1B}[F"
-        case .pageUp:
-            return "\u{1B}[5~"
-        case .pageDown:
-            return "\u{1B}[6~"
-        case .function(let num):
-            // F1-F12 escape sequences
-            switch num {
-            case 1: return "\u{1B}OP"
-            case 2: return "\u{1B}OQ"
-            case 3: return "\u{1B}OR"
-            case 4: return "\u{1B}OS"
-            case 5: return "\u{1B}[15~"
-            case 6: return "\u{1B}[17~"
-            case 7: return "\u{1B}[18~"
-            case 8: return "\u{1B}[19~"
-            case 9: return "\u{1B}[20~"
-            case 10: return "\u{1B}[21~"
-            case 11: return "\u{1B}[23~"
-            case 12: return "\u{1B}[24~"
-            default: return ""
-            }
         }
     }
 }

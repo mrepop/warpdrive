@@ -57,21 +57,32 @@ struct TerminalView: UIViewRepresentable {
     @Binding var terminalController: TerminalViewController?
     
     func makeUIView(context: Context) -> NativeTerminalView {
+        print("🖥️ Creating TerminalView with frame: .zero")
         let termView = NativeTerminalView(frame: .zero)
+        termView.nativeForegroundColor = .white
+        termView.nativeBackgroundColor = .black
+        print("🖥️ TerminalView created, bounds: \(termView.bounds)")
         
         // Create controller
         let controller = TerminalViewController(terminalView: termView)
+        print("🖥️ TerminalViewController created")
         
         // Update binding
         DispatchQueue.main.async {
             terminalController = controller
+            print("🖥️ Terminal controller bound")
         }
         
         return termView
     }
     
     func updateUIView(_ uiView: NativeTerminalView, context: Context) {
-        // No updates needed
+        // Update display when size changes
+        print("🖥️ updateUIView called, bounds: \(uiView.bounds)")
+        if uiView.bounds.size != .zero {
+            print("🖥️ Triggering display update")
+            uiView.setNeedsDisplay()
+        }
     }
 }
 

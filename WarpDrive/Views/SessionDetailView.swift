@@ -19,6 +19,7 @@ struct SessionDetailView: View {
             VStack(spacing: 0) {
                 // Terminal view with SwiftTerm
                 TerminalView(terminalController: $terminalController)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.black)
                 
                 Divider()
@@ -35,10 +36,15 @@ struct SessionDetailView: View {
                     TextField("Enter command...", text: $command)
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
-                        .onSubmit(sendCommand)
                         #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.asciiCapable)
                         .focused($isInputFocused)
                         #endif
+                        .onSubmit(sendCommand)
+                        .onChange(of: command) { oldValue, newValue in
+                            handleCommandInput(oldValue: oldValue, newValue: newValue)
+                        }
                     
                     Button(action: sendCommand) {
                         Image(systemName: "paperplane.fill")
@@ -103,25 +109,48 @@ struct SessionDetailView: View {
     
     private func loadOutput() async {
         isLoading = true
+        print("📱 SessionDetailView: loadOutput started for session \(session.name)")
+        print("📱 Terminal controller: \(terminalController != nil ? "exists" : "nil")")
         
         do {
             let captured = try await tmuxManager.capturePaneOutput(session: session, lines: 100)
+            print("📱 Captured output length: \(captured.count) characters")
+            print("📱 First 100 chars: \(String(captured.prefix(100)))")
+            
             await MainActor.run {
+                print("📱 About to feed text to terminal controller")
                 terminalController?.clear()
                 terminalController?.feed(text: captured)
+                print("📱 Text fed to terminal controller")
             }
         } catch {
+            print("📱 Error capturing output: \(error)")
             await MainActor.run {
                 terminalController?.feed(text: "Error: \(error.localizedDescription)\n")
             }
         }
         
         isLoading = false
+        print("📱 loadOutput completed")
     }
     
     private func refreshOutput() {
         Task {
             await loadOutput()
+        }
+    }
+    
+    private func handleCommandInput(oldValue: String, newValue: String) {
+        // Echo new characters immediately to terminal for local feedback
+        if newValue.count > oldValue.count {
+            let diff = String(newValue.suffix(newValue.count - oldValue.count))
+            terminalController?.feed(text: diff)
+        } else if newValue.count < oldValue.count {
+            // Handle backspace - send backspace control sequence
+            let deleteCount = oldValue.count - newValue.count
+            for _ in 0..<deleteCount {
+                terminalController?.feed(text: "\u{08} \u{08}") // BS + space + BS to erase
+            }
         }
     }
     
@@ -135,12 +164,14 @@ struct SessionDetailView: View {
                 // Send Enter key
                 try await tmuxManager.sendKeys("Enter", session: session)
                 
+                // Echo newline locally
                 await MainActor.run {
+                    terminalController?.feed(text: "\n")
                     command = ""
                 }
                 
                 // Wait a bit for command to execute
-                try await Task.sleep(nanoseconds: 500_000_000)
+                try await Task.sleep(nanoseconds: 200_000_000)
                 
                 // Refresh output
                 await loadOutput()
@@ -222,8 +253,8 @@ struct SessionDetailView: View {
     }
     
     private func startAutoRefresh() {
-        // Auto-refresh terminal output every 2 seconds
-        autoRefreshTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+        // Auto-refresh terminal output every 300ms for responsive feedback
+        autoRefreshTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { _ in
             Task {
                 await loadOutput()
             }
