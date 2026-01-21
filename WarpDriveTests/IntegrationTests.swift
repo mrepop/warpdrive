@@ -117,11 +117,6 @@ final class IntegrationTests: XCTestCase {
             
             // Verify it exists
             let sessions = try await tmuxManager.listSessions()
-            print("DEBUG: Created session '\(testSessionName)'")
-            print("DEBUG: Found \(sessions.count) sessions:")
-            for s in sessions {
-                print("  - \(s.name)")
-            }
             XCTAssertTrue(sessions.contains(where: { $0.name == testSessionName }), "Session should exist. Found: \(sessions.map { $0.name })")
             
             // Kill session
