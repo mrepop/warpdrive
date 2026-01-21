@@ -15,5 +15,8 @@ class TerminalSettings: ObservableObject {
     /// Maximum allowed font size
     static let maxFontSize: Double = 24.0
     
+    /// Auto-hide keyboard accessory when not in use (default true for more screen space)
+    @AppStorage("keyboardAutoHide") var keyboardAutoHide: Bool = true
+    
     private init() {}
 }

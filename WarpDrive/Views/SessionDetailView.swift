@@ -9,85 +9,53 @@ struct SessionDetailView: View {
     @ObservedObject var tmuxManager: TmuxManager
     
     @State private var terminalController: TerminalViewController?
-    @State private var command: String = ""
     @State private var isLoading = false
     @State private var autoRefreshTimer: Timer?
+    @State private var showKeyboardAccessory = false
+    @ObservedObject var settings = TerminalSettings.shared
     @Environment(\.dismiss) private var dismiss
     
-    #if os(iOS)
-    @FocusState private var isInputFocused: Bool
-    #endif
-    
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Terminal view with SwiftTerm
-                TerminalView(terminalController: $terminalController)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black)
-                
-                Divider()
-                
-                #if os(iOS)
-                // Custom keyboard accessory for iOS
-                TerminalKeyboardAccessory { key in
-                    handleTerminalKey(key)
+        ZStack {
+            // Full-screen terminal
+            TerminalView(terminalController: $terminalController)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
+                .edgesIgnoringSafeArea(.all)
+            
+            #if os(iOS)
+            // Keyboard accessory overlay (conditionally shown)
+            if showKeyboardAccessory && (!settings.keyboardAutoHide || showKeyboardAccessory) {
+                VStack {
+                    Spacer()
+                    TerminalKeyboardAccessory { key in
+                        handleTerminalKey(key)
+                    }
+                    .background(Color.black.opacity(0.9))
                 }
-                #endif
-                
-                // Command input area
-                HStack {
-                    TextField("Enter command...", text: $command)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.asciiCapable)
-                        .focused($isInputFocused)
-                        #endif
-                        .onSubmit(sendCommand)
-                        .onChange(of: command) { oldValue, newValue in
-                            handleCommandInput(oldValue: oldValue, newValue: newValue)
-                        }
-                    
-                    Button(action: sendCommand) {
-                        Image(systemName: "paperplane.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(command.isEmpty || isLoading)
-                    
-                    #if os(iOS)
-                    // Copy button
-                    Button(action: copySelectedText) {
-                        Image(systemName: "doc.on.clipboard")
-                    }
-                    .buttonStyle(.bordered)
-                    
-                    // Paste button
-                    Button(action: pasteText) {
-                        Image(systemName: "doc.on.clipboard.fill")
-                    }
-                    .buttonStyle(.bordered)
-                    #endif
-                }
-                .padding()
-                #if os(macOS)
-                .background(Color(NSColor.controlBackgroundColor))
-                #else
-                .background(Color(.systemBackground))
-                #endif
+                .transition(.move(edge: .bottom))
             }
-            .navigationTitle(session.name)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        stopAutoRefresh()
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .primaryAction) {
+            #endif
+            
+            // Floating menu button overlay (top-left)
+            VStack {
+                HStack {
                     Menu {
+                        Button(action: copySelectedText) {
+                            Label("Copy", systemImage: "doc.on.clipboard")
+                        }
+                        
+                        Button(action: pasteText) {
+                            Label("Paste", systemImage: "doc.on.clipboard.fill")
+                        }
+                        
+                        Divider()
+                        
+                        Button(action: { showKeyboardAccessory.toggle() }) {
+                            Label(showKeyboardAccessory ? "Hide Keys" : "Show Keys", 
+                                  systemImage: showKeyboardAccessory ? "keyboard.chevron.compact.down" : "keyboard")
+                        }
+                        
                         Button(action: refreshOutput) {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
@@ -96,14 +64,31 @@ struct SessionDetailView: View {
                             Label("Clear", systemImage: "trash")
                         }
                         
+                        Divider()
+                        
+                        Button(action: { dismiss() }) {
+                            Label("Close", systemImage: "xmark")
+                        }
+                        
                         Button(role: .destructive, action: killSession) {
                             Label("Kill Session", systemImage: "xmark.circle")
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Image(systemName: "line.3.horizontal.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(12)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
                     }
+                    .padding()
+                    
+                    Spacer()
                 }
+                Spacer()
             }
+        }
+        .navigationBarHidden(true)
             .task {
                 // Wait for terminal controller to be initialized
                 var attempts = 0
@@ -120,7 +105,6 @@ struct SessionDetailView: View {
                     startAutoRefresh()
                 }
             }
-        }
     }
     
     private func loadOutput() async {
@@ -151,49 +135,6 @@ struct SessionDetailView: View {
     private func refreshOutput() {
         Task {
             await loadOutput()
-        }
-    }
-    
-    private func handleCommandInput(oldValue: String, newValue: String) {
-        // Echo new characters immediately to terminal for local feedback
-        if newValue.count > oldValue.count {
-            let diff = String(newValue.suffix(newValue.count - oldValue.count))
-            terminalController?.feed(text: diff)
-        } else if newValue.count < oldValue.count {
-            // Handle backspace - send backspace control sequence
-            let deleteCount = oldValue.count - newValue.count
-            for _ in 0..<deleteCount {
-                terminalController?.feed(text: "\u{08} \u{08}") // BS + space + BS to erase
-            }
-        }
-    }
-    
-    private func sendCommand() {
-        guard !command.isEmpty else { return }
-        
-        Task {
-            do {
-                // Send the command
-                try await tmuxManager.sendKeys(command, session: session)
-                // Send Enter key
-                try await tmuxManager.sendKeys("Enter", session: session)
-                
-                // Echo newline locally
-                await MainActor.run {
-                    terminalController?.feed(text: "\n")
-                    command = ""
-                }
-                
-                // Wait a bit for command to execute
-                try await Task.sleep(nanoseconds: 200_000_000)
-                
-                // Refresh output
-                await loadOutput()
-            } catch {
-                await MainActor.run {
-                    terminalController?.feed(text: "\nError: \(error.localizedDescription)\n")
-                }
-            }
         }
     }
     

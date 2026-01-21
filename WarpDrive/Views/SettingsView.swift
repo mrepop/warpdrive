@@ -38,6 +38,17 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                
+                Section(header: Text("Keyboard")) {
+                    Toggle(isOn: $settings.keyboardAutoHide) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Auto-hide Terminal Keys")
+                            Text("Hide the terminal key accessory bar when not in use to maximize screen space.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

@@ -6,6 +6,7 @@ struct SessionTabView: View {
     let initialSession: TmuxSession?
     @State private var activeSessions: [ActiveSession] = []
     @State private var selectedSessionId: UUID?
+    @State private var showSessionPicker = false
     
     struct ActiveSession: Identifiable {
         let id = UUID()
@@ -14,37 +15,7 @@ struct SessionTabView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Tab bar
-            if !activeSessions.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(activeSessions) { activeSession in
-                            TabButton(
-                                title: activeSession.session.name,
-                                isSelected: selectedSessionId == activeSession.id,
-                                onSelect: {
-                                    selectedSessionId = activeSession.id
-                                },
-                                onClose: {
-                                    closeSession(activeSession.id)
-                                }
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                }
-                .frame(height: 44)
-                #if os(iOS)
-                .background(Color(.systemGray6))
-                #else
-                .background(Color(NSColor.controlBackgroundColor))
-                #endif
-                
-                Divider()
-            }
-            
+        ZStack {
             // Content area - show selected session's terminal
             if let activeSession = activeSessions.first(where: { $0.id == selectedSessionId }) {
                 SessionDetailView(session: activeSession.session, tmuxManager: tmuxManager)
@@ -52,11 +23,45 @@ struct SessionTabView: View {
                 Text("No active sessions")
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
             } else {
                 Text("Select a session")
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
             }
+            
+            // Floating session picker button (top-right, only if multiple sessions)
+            if activeSessions.count > 1 {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: { showSessionPicker = true }) {
+                            HStack(spacing: 4) {
+                                Text(activeSessions.first(where: { $0.id == selectedSessionId })?.session.name ?? "Session")
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.down.circle.fill")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Capsule())
+                        }
+                        .padding()
+                    }
+                    Spacer()
+                }
+            }
+        }
+        .sheet(isPresented: $showSessionPicker) {
+            SessionPickerSheet(
+                sessions: activeSessions,
+                selectedId: $selectedSessionId,
+                onClose: { id in closeSession(id) }
+            )
         }
         .onAppear {
             // Open initial session if provided
@@ -92,39 +97,48 @@ struct SessionTabView: View {
     }
 }
 
-/// Individual tab button
-private struct TabButton: View {
-    let title: String
-    let isSelected: Bool
-    let onSelect: () -> Void
-    let onClose: () -> Void
+/// Session picker sheet for switching between sessions
+private struct SessionPickerSheet: View {
+    let sessions: [SessionTabView.ActiveSession]
+    @Binding var selectedId: UUID?
+    let onClose: (UUID) -> Void
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        HStack(spacing: 4) {
-            Button(action: onSelect) {
-                Text(title)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .primary : .secondary)
-                    .lineLimit(1)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+        NavigationView {
+            List {
+                ForEach(sessions) { session in
+                    Button(action: {
+                        selectedId = session.id
+                        dismiss()
+                    }) {
+                        HStack {
+                            Text(session.session.name)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if selectedId == session.id {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+                .onDelete { indexSet in
+                    for index in indexSet {
+                        onClose(sessions[index].id)
+                    }
+                }
             }
-            
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .padding(4)
+            .navigationTitle("Sessions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                #if os(iOS)
-                .fill(isSelected ? Color(.systemGray4) : Color(.systemGray5))
-                #else
-                .fill(isSelected ? Color(NSColor.controlBackgroundColor) : Color(NSColor.textBackgroundColor))
-                #endif
-        )
     }
 }
 
