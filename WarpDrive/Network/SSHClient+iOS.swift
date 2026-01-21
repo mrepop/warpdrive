@@ -53,18 +53,9 @@ extension SSHClient {
                     let privateKey = try Insecure.RSA.PrivateKey(sshRsa: keyString)
                     authMethod = .rsa(username: config.credentials.username, privateKey: privateKey)
                     logDebug("iOS SSH: Using RSA key authentication", category: .ssh)
-                } else if keyString.contains("BEGIN PRIVATE KEY") {
-                    // Could be Ed25519 or ECDSA - try Ed25519 first
-                    do {
-                        let privateKey = try Curve25519.Signing.PrivateKey(pemRepresentation: keyString)
-                        authMethod = .ed25519(username: config.credentials.username, privateKey: privateKey)
-                        logDebug("iOS SSH: Using Ed25519 key authentication", category: .ssh)
-                    } catch {
-                        logError("iOS SSH: Failed to parse key as Ed25519: \(error)", category: .ssh)
-                        throw SSHError.authenticationFailed("Unsupported key format")
-                    }
                 } else {
-                    throw SSHError.authenticationFailed("Unknown private key format")
+                    // TODO: Add support for Ed25519 and ECDSA keys
+                    throw SSHError.authenticationFailed("Only RSA keys are currently supported. Ed25519/ECDSA support coming soon.")
                 }
             } catch {
                 logError("iOS SSH: Failed to load/parse private key: \(error)", category: .ssh)

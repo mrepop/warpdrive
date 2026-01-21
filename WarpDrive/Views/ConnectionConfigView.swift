@@ -9,7 +9,7 @@ struct ConnectionConfigView: View {
     @State private var port: String = "22"
     @State private var username: String = ProcessInfo.processInfo.environment["USER"] ?? ""
     #if os(iOS)
-    @State private var authMethod: AuthMethodSelection = .password
+    @State private var authMethod: AuthMethodSelection = .publicKey
     #else
     @State private var authMethod: AuthMethodSelection = .agent
     #endif
