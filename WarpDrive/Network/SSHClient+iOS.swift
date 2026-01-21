@@ -16,8 +16,11 @@ extension SSHClient {
         // Create or reuse SSH client
         let client = try await getOrCreateClient(config: config)
         
-        // Execute command using Citadel
-        let result = try await client.executeCommand(command)
+        // Execute command using Citadel - returns ByteBuffer
+        let resultBuffer = try await client.executeCommand(command)
+        
+        // Convert ByteBuffer to String
+        let result = resultBuffer.getString(at: resultBuffer.readerIndex, length: resultBuffer.readableBytes) ?? ""
         
         logDebug("iOS SSH: Command completed, output length: \(result.count)", category: .ssh)
         return result
@@ -48,13 +51,12 @@ extension SSHClient {
             throw SSHError.authenticationFailed("Agent auth not yet implemented for iOS")
         }
         
-        // Create client settings
+        // Create client settings - authenticationMethod needs to be a closure
         let settings = SSHClientSettings(
             host: config.host,
             port: Int(config.port),
-            authenticationMethod: authMethod,
-            hostKeyValidator: .acceptAnything(), // For Phase 2 - should be made configurable
-            reconnect: .never
+            authenticationMethod: { authMethod },
+            hostKeyValidator: .acceptAnything() // For Phase 2 - should be made configurable
         )
         
         logInfo("iOS SSH: Connecting to \(config.host):\(config.port)", category: .ssh)

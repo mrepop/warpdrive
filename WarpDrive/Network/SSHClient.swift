@@ -124,6 +124,7 @@ public class SSHClient: ObservableObject {
         #endif
     }
     
+    #if os(macOS)
     private func executeSSHCommand_macOS(config: SSHConnectionConfig, command: String) async throws -> String {
         return try await withCheckedThrowingContinuation { continuation in
             let process = Process()
@@ -191,4 +192,5 @@ public class SSHClient: ObservableObject {
             }
         }
     }
+    #endif
 }
