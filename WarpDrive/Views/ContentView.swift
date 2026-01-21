@@ -1,12 +1,13 @@
 import SwiftUI
 
-struct ContentView: View {
+public struct ContentView: View {
+    public init() {}
     @StateObject private var sshClient = SSHClient()
     @StateObject private var tmuxManager = TmuxManager()
     @State private var showingConnection = false
     @State private var isConnecting = false
     
-    var body: some View {
+    public var body: some View {
         NavigationStack {
             if sshClient.connectionState.isConnected {
                 SessionListView(tmuxManager: tmuxManager, sshClient: sshClient)

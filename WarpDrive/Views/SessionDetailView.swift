@@ -38,7 +38,11 @@ struct SessionDetailView: View {
                     .disabled(command.isEmpty || isLoading)
                 }
                 .padding()
+                #if os(macOS)
                 .background(Color(NSColor.controlBackgroundColor))
+                #else
+                .background(Color(.systemBackground))
+                #endif
             }
             .navigationTitle(session.name)
             .toolbar {

@@ -15,9 +15,11 @@ public class SSHClient: ObservableObject {
     
     // For now, we'll use a simple process-based approach for macOS testing
     // In production iOS, we'd use a proper SSH library like NMSSH or libssh2
+    #if os(macOS)
     private var sshProcess: Process?
     private var inputPipe: Pipe?
     private var outputPipe: Pipe?
+    #endif
     
     public init() {
         logInfo("SSHClient initialized", category: .ssh)
@@ -46,10 +48,12 @@ public class SSHClient: ObservableObject {
     public func disconnect() {
         logInfo("Disconnecting from SSH", category: .ssh)
         
+        #if os(macOS)
         sshProcess?.terminate()
         sshProcess = nil
         inputPipe = nil
         outputPipe = nil
+        #endif
         
         connectionState = .disconnected
     }
@@ -75,11 +79,15 @@ public class SSHClient: ObservableObject {
     }
     
     public func sendData(_ data: Data) throws {
+        #if os(macOS)
         guard let pipe = inputPipe else {
             throw SSHError.connectionFailed("No input pipe available")
         }
         
         try pipe.fileHandleForWriting.write(contentsOf: data)
+        #else
+        throw SSHError.connectionFailed("sendData not implemented for iOS")
+        #endif
     }
     
     public func sendString(_ string: String) throws {
@@ -105,6 +113,7 @@ public class SSHClient: ObservableObject {
     }
     
     private func executeSSHCommand(config: SSHConnectionConfig, command: String) async throws -> String {
+        #if os(macOS)
         return try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             let outputPipe = Pipe()
@@ -170,5 +179,9 @@ public class SSHClient: ObservableObject {
                 continuation.resume(throwing: SSHError.commandExecutionFailed(error.localizedDescription))
             }
         }
+        #else
+        // iOS implementation
+        throw SSHError.commandExecutionFailed("SSH not yet implemented for iOS - this is Phase 1 macOS testing")
+        #endif
     }
 }
