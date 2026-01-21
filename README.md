@@ -4,7 +4,7 @@ An iOS application for controlling and monitoring Warp console sessions from you
 
 ## Status
 
-**Phase 3 Complete | Phase 4 In Progress**
+**Phase 4 Complete**
 
 WarpDrive now supports:
 - SSH connection with RSA key authentication (iOS & macOS)
@@ -17,6 +17,9 @@ WarpDrive now supports:
 - Optimized terminal refresh (300ms) for better usability
 - No auto-capitalization on iOS keyboard
 - Customizable terminal font size (8-24pt)
+- Minimal overlay UI maximizing screen space for terminal
+- Floating menu buttons instead of navigation bars
+- Auto-hide keyboard accessory (configurable)
 
 ## Quick Start
 
@@ -54,6 +57,12 @@ open Package.swift  # Opens in Xcode
 - Multiple session tabs
 - iOS keyboard optimized for terminal (no auto-capitalization)
 - Customizable terminal font size (8-24pt, default 10pt for phones)
+- Minimal overlay UI design:
+  - Full-screen terminal with no navigation bars
+  - Small floating menu button for actions (Copy, Paste, Refresh, etc.)
+  - Session switcher as compact floating button (when multiple sessions)
+  - Auto-hide keyboard accessory (toggle via menu or settings)
+  - Semi-transparent overlays that don't obscure terminal content
 - Comprehensive error handling and diagnostic logging
 - Cross-platform (iOS & macOS)
 
