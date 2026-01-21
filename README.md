@@ -4,15 +4,18 @@ An iOS application for controlling and monitoring Warp console sessions from you
 
 ## Status
 
-**Phase 1 Complete!** 
+**Phase 3 Complete | Phase 4 In Progress**
 
 WarpDrive now supports:
-- SSH connection to remote servers
-- tmux session listing and management
-- Terminal output viewing
-- Command execution in sessions
-- Session creation and deletion
-- Full diagnostic logging
+- SSH connection with RSA key authentication (iOS & macOS)
+- tmux session discovery, creation, and management
+- Full SwiftTerm terminal emulation with ANSI escape sequences
+- Custom iOS keyboard with terminal keys (ESC, TAB, arrows, F-keys)
+- Copy/paste functionality
+- Multiple session tabs
+- Immediate character echo for responsive typing
+- Optimized terminal refresh (300ms) for better usability
+- No auto-capitalization on iOS keyboard
 
 ## Quick Start
 
@@ -36,20 +39,28 @@ open Package.swift  # Opens in Xcode
 
 ## Features
 
-### Current (Phase 1)
-- SSH connection with key-based authentication
-- tmux session discovery and listing
-- View terminal output (last 100 lines)
-- Send commands to sessions
-- Create and delete sessions
-- Comprehensive error handling and logging
+### Current (Phases 1-4)
+- SSH connection with RSA key authentication (iOS & macOS)
+- tmux session discovery, creation, deletion, and management
+- Full SwiftTerm terminal emulation with VT100/Xterm support
+- Custom iOS keyboard accessory with:
+  - Terminal control keys (ESC, TAB, CTRL, ALT)
+  - Arrow keys and navigation (HOME, END, PGUP, PGDN)
+  - Function keys (F1-F12)
+- Immediate character echo for responsive input
+- Fast terminal refresh (300ms polling)
+- Copy/paste support
+- Multiple session tabs
+- iOS keyboard optimized for terminal (no auto-capitalization)
+- Comprehensive error handling and diagnostic logging
+- Cross-platform (iOS & macOS)
 
 ### Coming Soon
-- Real-time terminal streaming
-- Full terminal emulation with SwiftTerm
+- Real-time terminal streaming (replace polling)
 - Bonjour/mDNS server discovery
-- Bridge server for advanced scenarios
-- Enhanced security features
+- Session persistence across app restarts
+- Touch gestures (pinch-to-zoom, swipe actions)
+- Terminal themes and customization
 
 ## Requirements
 
