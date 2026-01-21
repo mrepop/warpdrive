@@ -9,6 +9,7 @@ struct SessionListView: View {
     @State private var newSessionName = ""
     @State private var errorMessage: String?
     @State private var selectedSession: TmuxSession?
+    @State private var showingSessionTabs = false
     
     var body: some View {
         List {
@@ -48,7 +49,14 @@ struct SessionListView: View {
                     ForEach(tmuxManager.sessions) { session in
                         SessionRow(session: session)
                             .onTapGesture {
+                                #if os(iOS)
+                                // On iOS, open in tab view for multiple sessions
                                 selectedSession = session
+                                showingSessionTabs = true
+                                #else
+                                // On macOS, open in sheet
+                                selectedSession = session
+                                #endif
                             }
                     }
                 }
@@ -94,9 +102,30 @@ struct SessionListView: View {
         } message: {
             Text("Enter a name for the new tmux session")
         }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showingSessionTabs) {
+            if let session = selectedSession {
+                NavigationStack {
+                    SessionTabView(tmuxManager: tmuxManager)
+                        .onAppear {
+                            // TODO: Open the selected session in tab view
+                        }
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    showingSessionTabs = false
+                                    selectedSession = nil
+                                }
+                            }
+                        }
+                }
+            }
+        }
+        #else
         .sheet(item: $selectedSession) { session in
             SessionDetailView(session: session, tmuxManager: tmuxManager)
         }
+        #endif
     }
     
     @MainActor
