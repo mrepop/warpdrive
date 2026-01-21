@@ -4,7 +4,7 @@ An iOS application for controlling and monitoring Warp console sessions from you
 
 ## Status
 
-**Phase 1 Complete!** 🎉
+**Phase 1 Complete!** 
 
 WarpDrive now supports:
 - SSH connection to remote servers
