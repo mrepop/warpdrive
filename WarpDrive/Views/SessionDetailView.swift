@@ -1,4 +1,8 @@
 import SwiftUI
+#if os(iOS)
+import SwiftTerm
+import UIKit
+#endif
 
 struct SessionDetailView: View {
     let session: TmuxSession
@@ -118,10 +122,8 @@ struct SessionDetailView: View {
             print("📱 First 100 chars: \(String(captured.prefix(100)))")
             
             await MainActor.run {
-                print("📱 About to feed text to terminal controller")
                 terminalController?.clear()
                 terminalController?.feed(text: captured)
-                print("📱 Text fed to terminal controller")
             }
         } catch {
             print("📱 Error capturing output: \(error)")
