@@ -53,6 +53,10 @@ public class SSHClient: ObservableObject {
         sshProcess = nil
         inputPipe = nil
         outputPipe = nil
+        #else
+        Task {
+            await cleanup_iOS()
+        }
         #endif
         
         connectionState = .disconnected
@@ -114,6 +118,13 @@ public class SSHClient: ObservableObject {
     
     private func executeSSHCommand(config: SSHConnectionConfig, command: String) async throws -> String {
         #if os(macOS)
+        return try await executeSSHCommand_macOS(config: config, command: command)
+        #else
+        return try await executeSSHCommand_iOS(config: config, command: command)
+        #endif
+    }
+    
+    private func executeSSHCommand_macOS(config: SSHConnectionConfig, command: String) async throws -> String {
         return try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             let outputPipe = Pipe()
@@ -179,9 +190,5 @@ public class SSHClient: ObservableObject {
                 continuation.resume(throwing: SSHError.commandExecutionFailed(error.localizedDescription))
             }
         }
-        #else
-        // iOS implementation
-        throw SSHError.commandExecutionFailed("SSH not yet implemented for iOS - this is Phase 1 macOS testing")
-        #endif
     }
 }

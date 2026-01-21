@@ -1,155 +1,76 @@
 import Foundation
 import Combine
-import NIOCore
-import NIOPosix
-import NIOSSH
-import Crypto
+import Citadel
 
 #if os(iOS)
-// iOS-specific SSH implementation using NIO-SSH
-
-/// Client authentication delegate for NIO-SSH
-final class WarpDriveClientAuthDelegate: NIOSSHClientUserAuthenticationDelegate {
-    private let credentials: SSHCredentials
-    private var attemptedMethods: Set<String> = []
-    
-    init(credentials: SSHCredentials) {
-        self.credentials = credentials
-    }
-    
-    func nextAuthenticationType(
-        availableMethods: NIOSSHAvailableUserAuthenticationMethods,
-        nextChallengePromise: EventLoopPromise<NIOSSHUserAuthenticationOffer?>
-    ) {
-        logDebug("Available auth methods: \(availableMethods)", category: .ssh)
-        
-        switch credentials.authMethod {
-        case .agent:
-            if availableMethods.contains(.publicKey) && !attemptedMethods.contains("agent") {
-                attemptedMethods.insert("agent")
-                // For agent auth, we need to handle this differently
-                // For now, signal completion
-                nextChallengePromise.succeed(nil)
-            } else {
-                nextChallengePromise.succeed(nil)
-            }
-            
-        case .publicKey(let keyPath, let passphrase):
-            if availableMethods.contains(.publicKey) && !attemptedMethods.contains("publicKey") {
-                attemptedMethods.insert("publicKey")
-                
-                do {
-                    let keyData = try Data(contentsOf: URL(fileURLWithPath: keyPath))
-                    let keyString = String(data: keyData, encoding: .utf8) ?? ""
-                    
-                    // Try to parse as Ed25519 or other key types
-                    let privateKey = try parsePrivateKey(keyString, passphrase: passphrase)
-                    
-                    let offer = NIOSSHUserAuthenticationOffer(
-                        username: credentials.username,
-                        serviceName: "ssh-connection",
-                        offer: .privateKey(.init(privateKey: privateKey))
-                    )
-                    nextChallengePromise.succeed(offer)
-                } catch {
-                    logError("Failed to load private key: \(error)", category: .ssh)
-                    nextChallengePromise.succeed(nil)
-                }
-            } else {
-                nextChallengePromise.succeed(nil)
-            }
-            
-        case .password(let password):
-            if availableMethods.contains(.password) && !attemptedMethods.contains("password") {
-                attemptedMethods.insert("password")
-                let offer = NIOSSHUserAuthenticationOffer(
-                    username: credentials.username,
-                    serviceName: "ssh-connection",
-                    offer: .password(.init(password: password))
-                )
-                nextChallengePromise.succeed(offer)
-            } else {
-                nextChallengePromise.succeed(nil)
-            }
-        }
-    }
-    
-    private func parsePrivateKey(_ keyString: String, passphrase: String?) throws -> NIOSSHPrivateKey {
-        // Try Ed25519 first
-        if keyString.contains("BEGIN OPENSSH PRIVATE KEY") || keyString.contains("BEGIN PRIVATE KEY") {
-            // For now, assume Ed25519 - full implementation would parse key type
-            let key = Curve25519.Signing.PrivateKey()
-            return NIOSSHPrivateKey(ed25519Key: key)
-        }
-        throw SSHError.authenticationFailed("Unsupported key format")
-    }
-}
-
-/// Server authentication delegate that accepts all host keys (for testing)
-final class AcceptAllServerAuthDelegate: NIOSSHClientServerAuthenticationDelegate {
-    func validateHostKey(hostKey: NIOSSHPublicKey, validationCompletePromise: EventLoopPromise<Void>) {
-        logDebug("Accepting host key (no validation in Phase 2)", category: .ssh)
-        validationCompletePromise.succeed(())
-    }
-}
-
-/// SSH child channel handler for executing commands
-final class SSHCommandHandler: ChannelDuplexHandler {
-    typealias InboundIn = SSHChannelData
-    typealias InboundOut = ByteBuffer
-    typealias OutboundIn = ByteBuffer
-    typealias OutboundOut = SSHChannelData
-    
-    private var outputBuffer = ""
-    private let promise: EventLoopPromise<String>
-    
-    init(promise: EventLoopPromise<String>) {
-        self.promise = promise
-    }
-    
-    func handlerAdded(context: ChannelHandlerContext) {
-        context.channel.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).whenFailure { error in
-            logError("Failed to set half-closure: \(error)", category: .ssh)
-        }
-    }
-    
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let data = self.unwrapInboundIn(data)
-        
-        guard case .byteBuffer(let buffer) = data.data else {
-            return
-        }
-        
-        if let string = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) {
-            outputBuffer += string
-        }
-    }
-    
-    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
-        if event is ChannelEvent, case .inputClosed = event as! ChannelEvent {
-            // Command finished
-            promise.succeed(outputBuffer)
-            context.close(promise: nil)
-        }
-    }
-    
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
-        logError("SSH channel error: \(error)", category: .ssh)
-        promise.fail(error)
-        context.close(promise: nil)
-    }
-}
+// iOS-specific SSH implementation using Citadel (high-level wrapper over NIO-SSH)
 
 extension SSHClient {
-    private static var eventLoopGroup: MultiThreadedEventLoopGroup?
+    // Private property to store the Citadel SSH client
+    private static var citadelClient: Citadel.SSHClient?
     
-    private static func getEventLoopGroup() -> MultiThreadedEventLoopGroup {
-        if let group = eventLoopGroup {
-            return group
+    /// iOS implementation using Citadel
+    func executeSSHCommand_iOS(config: SSHConnectionConfig, command: String) async throws -> String {
+        logDebug("iOS SSH: Executing command: \(command)", category: .ssh)
+        
+        // Create or reuse SSH client
+        let client = try await getOrCreateClient(config: config)
+        
+        // Execute command using Citadel
+        let result = try await client.executeCommand(command)
+        
+        logDebug("iOS SSH: Command completed, output length: \(result.count)", category: .ssh)
+        return result
+    }
+    
+    private func getOrCreateClient(config: SSHConnectionConfig) async throws -> Citadel.SSHClient {
+        // If we have an existing client, try to reuse it
+        if let existingClient = Self.citadelClient {
+            // TODO: Check if connection is still valid
+            return existingClient
         }
-        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        eventLoopGroup = group
-        return group
+        
+        // Create authentication method
+        let authMethod: SSHAuthenticationMethod
+        
+        switch config.credentials.authMethod {
+        case .password(let password):
+            authMethod = .passwordBased(username: config.credentials.username, password: password)
+            
+        case .publicKey(let keyPath, let passphrase):
+            // For now, fall back to password - full key parsing would be implemented here
+            logWarning("iOS SSH: Public key auth not fully implemented", category: .ssh)
+            throw SSHError.authenticationFailed("Public key auth not yet implemented for iOS")
+            
+        case .agent:
+            // Fall back to password for now
+            logWarning("iOS SSH: Agent auth not fully implemented", category: .ssh)
+            throw SSHError.authenticationFailed("Agent auth not yet implemented for iOS")
+        }
+        
+        // Create client settings
+        let settings = SSHClientSettings(
+            host: config.host,
+            port: Int(config.port),
+            authenticationMethod: authMethod,
+            hostKeyValidator: .acceptAnything(), // For Phase 2 - should be made configurable
+            reconnect: .never
+        )
+        
+        logInfo("iOS SSH: Connecting to \(config.host):\(config.port)", category: .ssh)
+        let client = try await Citadel.SSHClient.connect(to: settings)
+        
+        Self.citadelClient = client
+        return client
+    }
+    
+    /// iOS-specific connection cleanup
+    func cleanup_iOS() async {
+        if let client = Self.citadelClient {
+            logDebug("iOS SSH: Closing connection", category: .ssh)
+            try? await client.close()
+            Self.citadelClient = nil
+        }
     }
 }
 
