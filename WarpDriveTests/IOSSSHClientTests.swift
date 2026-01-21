@@ -19,23 +19,26 @@ final class IOSSSHClientTests: XCTestCase {
         try await super.tearDown()
     }
     
-    // Test basic SSH connection with password auth
-    func testSSHConnectionWithPassword() async throws {
+    // Test basic SSH connection with public key auth
+    func testSSHConnectionWithPublicKey() async throws {
         #if os(iOS)
         // Get username from environment
         let username = ProcessInfo.processInfo.environment["USER"] ?? "test"
+        let home = ProcessInfo.processInfo.environment["HOME"] ?? "/Users/\(username)"
+        let keyPath = "\(home)/.ssh/id_rsa"
         
-        // Note: This test requires SSH server to accept password auth
-        // For testing, you need to provide a valid password
-        let password = ProcessInfo.processInfo.environment["TEST_SSH_PASSWORD"] ?? ""
-        
-        guard !password.isEmpty else {
-            throw XCTestSkip("Skipping test: TEST_SSH_PASSWORD environment variable not set")
+        // Check if key exists
+        guard FileManager.default.fileExists(atPath: keyPath) else {
+            #if compiler(>=5.3)
+            throw XCTestSkip("Skipping test: SSH key not found at \(keyPath)")
+            #else
+            return
+            #endif
         }
         
         let credentials = SSHCredentials(
             username: username,
-            authMethod: .password(password)
+            authMethod: .publicKey(privateKeyPath: keyPath, passphrase: nil)
         )
         
         let config = SSHConnectionConfig(
@@ -51,7 +54,7 @@ final class IOSSSHClientTests: XCTestCase {
         let state = await sshClient.connectionState
         XCTAssertTrue(state.isConnected, "SSH client should be connected")
         #else
-        throw XCTestSkip("This test is only for iOS")
+        // Test skipped on non-iOS platforms
         #endif
     }
     
@@ -59,15 +62,20 @@ final class IOSSSHClientTests: XCTestCase {
     func testCommandExecution() async throws {
         #if os(iOS)
         let username = ProcessInfo.processInfo.environment["USER"] ?? "test"
-        let password = ProcessInfo.processInfo.environment["TEST_SSH_PASSWORD"] ?? ""
+        let home = ProcessInfo.processInfo.environment["HOME"] ?? "/Users/\(username)"
+        let keyPath = "\(home)/.ssh/id_rsa"
         
-        guard !password.isEmpty else {
-            throw XCTestSkip("Skipping test: TEST_SSH_PASSWORD environment variable not set")
+        guard FileManager.default.fileExists(atPath: keyPath) else {
+            #if compiler(>=5.3)
+            throw XCTestSkip("Skipping test: SSH key not found at \(keyPath)")
+            #else
+            return
+            #endif
         }
         
         let credentials = SSHCredentials(
             username: username,
-            authMethod: .password(password)
+            authMethod: .publicKey(privateKeyPath: keyPath, passphrase: nil)
         )
         
         let config = SSHConnectionConfig(
@@ -83,7 +91,7 @@ final class IOSSSHClientTests: XCTestCase {
         
         XCTAssertTrue(result.contains("test"), "Command output should contain 'test'")
         #else
-        throw XCTestSkip("This test is only for iOS")
+        // Test skipped on non-iOS platforms
         #endif
     }
     
@@ -117,7 +125,7 @@ final class IOSSSHClientTests: XCTestCase {
             }
         }
         #else
-        throw XCTestSkip("This test is only for iOS")
+        // Test skipped on non-iOS platforms
         #endif
     }
     
@@ -125,15 +133,20 @@ final class IOSSSHClientTests: XCTestCase {
     func testTmuxCommandExecution() async throws {
         #if os(iOS)
         let username = ProcessInfo.processInfo.environment["USER"] ?? "test"
-        let password = ProcessInfo.processInfo.environment["TEST_SSH_PASSWORD"] ?? ""
+        let home = ProcessInfo.processInfo.environment["HOME"] ?? "/Users/\(username)"
+        let keyPath = "\(home)/.ssh/id_rsa"
         
-        guard !password.isEmpty else {
-            throw XCTestSkip("Skipping test: TEST_SSH_PASSWORD environment variable not set")
+        guard FileManager.default.fileExists(atPath: keyPath) else {
+            #if compiler(>=5.3)
+            throw XCTestSkip("Skipping test: SSH key not found at \(keyPath)")
+            #else
+            return
+            #endif
         }
         
         let credentials = SSHCredentials(
             username: username,
-            authMethod: .password(password)
+            authMethod: .publicKey(privateKeyPath: keyPath, passphrase: nil)
         )
         
         let config = SSHConnectionConfig(
@@ -150,7 +163,7 @@ final class IOSSSHClientTests: XCTestCase {
         // Should either list sessions or say "no sessions"
         XCTAssertFalse(result.isEmpty, "Command should return output")
         #else
-        throw XCTestSkip("This test is only for iOS")
+        // Test skipped on non-iOS platforms
         #endif
     }
 }

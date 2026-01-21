@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import Citadel
+import Crypto
 
 #if os(iOS)
 // iOS-specific SSH implementation using Citadel (high-level wrapper over NIO-SSH)
@@ -41,9 +42,34 @@ extension SSHClient {
             authMethod = .passwordBased(username: config.credentials.username, password: password)
             
         case .publicKey(let keyPath, let passphrase):
-            // For now, fall back to password - full key parsing would be implemented here
-            logWarning("iOS SSH: Public key auth not fully implemented", category: .ssh)
-            throw SSHError.authenticationFailed("Public key auth not yet implemented for iOS")
+            // Parse SSH private key file
+            do {
+                let keyData = try Data(contentsOf: URL(fileURLWithPath: keyPath))
+                let keyString = String(data: keyData, encoding: .utf8) ?? ""
+                
+                // Try to parse the key based on format
+                if keyString.contains("BEGIN OPENSSH PRIVATE KEY") || keyString.contains("BEGIN RSA PRIVATE KEY") {
+                    // OpenSSH format RSA key
+                    let privateKey = try Insecure.RSA.PrivateKey(sshRsa: keyString)
+                    authMethod = .rsa(username: config.credentials.username, privateKey: privateKey)
+                    logDebug("iOS SSH: Using RSA key authentication", category: .ssh)
+                } else if keyString.contains("BEGIN PRIVATE KEY") {
+                    // Could be Ed25519 or ECDSA - try Ed25519 first
+                    do {
+                        let privateKey = try Curve25519.Signing.PrivateKey(pemRepresentation: keyString)
+                        authMethod = .ed25519(username: config.credentials.username, privateKey: privateKey)
+                        logDebug("iOS SSH: Using Ed25519 key authentication", category: .ssh)
+                    } catch {
+                        logError("iOS SSH: Failed to parse key as Ed25519: \(error)", category: .ssh)
+                        throw SSHError.authenticationFailed("Unsupported key format")
+                    }
+                } else {
+                    throw SSHError.authenticationFailed("Unknown private key format")
+                }
+            } catch {
+                logError("iOS SSH: Failed to load/parse private key: \(error)", category: .ssh)
+                throw SSHError.authenticationFailed("Failed to load private key: \(error.localizedDescription)")
+            }
             
         case .agent:
             // Fall back to password for now
