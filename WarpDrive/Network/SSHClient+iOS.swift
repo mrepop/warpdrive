@@ -76,11 +76,31 @@ extension SSHClient {
             hostKeyValidator: .acceptAnything() // For Phase 2 - should be made configurable
         )
         
-        logInfo("iOS SSH: Connecting to \(config.host):\(config.port)", category: .ssh)
-        let client = try await Citadel.SSHClient.connect(to: settings)
+        logInfo("iOS SSH: Connecting to \(config.host):\(config.port) as \(config.credentials.username)", category: .ssh)
         
-        Self.citadelClient = client
-        return client
+        do {
+            let client = try await Citadel.SSHClient.connect(to: settings)
+            logInfo("iOS SSH: Connection established successfully", category: .ssh)
+            Self.citadelClient = client
+            return client
+        } catch let error as SSHClientError {
+            logError("iOS SSH: Citadel SSHClientError: \(error)", category: .ssh)
+            switch error {
+            case .unsupportedPasswordAuthentication:
+                throw SSHError.authenticationFailed("Password authentication not supported by server")
+            case .unsupportedPrivateKeyAuthentication:
+                throw SSHError.authenticationFailed("Private key authentication not supported by server")
+            case .unsupportedHostBasedAuthentication:
+                throw SSHError.authenticationFailed("Host-based authentication not supported")
+            case .allAuthenticationOptionsFailed:
+                throw SSHError.authenticationFailed("All authentication methods failed - check username/password")
+            case .channelCreationFailed:
+                throw SSHError.channelCreationFailed("Failed to create SSH channel")
+            }
+        } catch {
+            logError("iOS SSH: Connection failed with error: \(error)", category: .ssh)
+            throw SSHError.connectionFailed(error.localizedDescription)
+        }
     }
     
     /// iOS-specific connection cleanup

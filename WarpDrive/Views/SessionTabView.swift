@@ -3,6 +3,7 @@ import SwiftUI
 /// Tab-based view for managing multiple active terminal sessions
 struct SessionTabView: View {
     @ObservedObject var tmuxManager: TmuxManager
+    let initialSession: TmuxSession?
     @State private var activeSessions: [ActiveSession] = []
     @State private var selectedSessionId: UUID?
     
@@ -55,6 +56,13 @@ struct SessionTabView: View {
                 Text("Select a session")
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .onAppear {
+            // Open initial session if provided
+            if let session = initialSession, activeSessions.isEmpty {
+                print("🔧 DEBUG: SessionTabView opening initial session: \(session.name)")
+                openSession(session)
             }
         }
     }
@@ -121,5 +129,5 @@ private struct TabButton: View {
 }
 
 #Preview {
-    SessionTabView(tmuxManager: TmuxManager())
+    SessionTabView(tmuxManager: TmuxManager(), initialSession: nil)
 }

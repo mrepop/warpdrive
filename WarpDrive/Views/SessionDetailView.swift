@@ -105,8 +105,20 @@ struct SessionDetailView: View {
                 }
             }
             .task {
-                await loadOutput()
-                startAutoRefresh()
+                // Wait for terminal controller to be initialized
+                var attempts = 0
+                while terminalController == nil && attempts < 50 {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                    attempts += 1
+                }
+                
+                if terminalController == nil {
+                    print("📱 ERROR: Terminal controller never initialized after 5 seconds")
+                } else {
+                    print("📱 Terminal controller ready after \(attempts * 100)ms")
+                    await loadOutput()
+                    startAutoRefresh()
+                }
             }
         }
     }
