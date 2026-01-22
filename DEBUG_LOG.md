@@ -71,3 +71,11 @@ Wed Jan 21 22:06:55 EST 2026: STILL showing normalContent. The #if DEBUG && os(i
 Wed Jan 21 22:07:24 EST 2026: Fixed to nested #if. Rebuilding and testing...
 Wed Jan 21 22:14:57 EST 2026: SAFETY UPDATE - Max image size set to 1000x1000. Must check/resize before ALL reads.
 Wed Jan 21 22:15:22 EST 2026: SAFETY UPDATE - Max image size set to 1000x1000. Must check/resize before ALL reads.
+
+Wed Jan 21 22:18:12 EST 2026: CRASH RECOVERY STATE
+API crashed again due to image >2000px (actual limit is 1000px max).
+Error: Anthropic API 400 - Image dimensions exceed max allowed size for many-image requests: 2000 pixels
+Action taken: Set max image size to 1000x1000px for all future reads.
+Status: Work paused until image size bug can be reliably prevented.
+Next session: Must implement mandatory resize check before ANY image read.
+
