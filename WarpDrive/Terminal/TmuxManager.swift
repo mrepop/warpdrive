@@ -180,14 +180,20 @@ public class TmuxManager: ObservableObject {
     }
     
     /// Capture pane output from a session
-    public func capturePaneOutput(session: TmuxSession, lines: Int = 100) async throws -> String {
+    public func capturePaneOutput(session: TmuxSession, lines: Int = 100, cols: Int? = nil, rows: Int? = nil) async throws -> String {
         guard let client = sshClient else {
             throw TmuxError.commandFailed("Not connected to SSH")
         }
         
         logDebug("Capturing pane output from session: \(session.name)", category: .tmux)
         
-        let output = try await client.execute(command: "\(tmuxPath) capture-pane -t '\(session.name)' -p -S -\(lines)")
+        // Resize tmux pane to match terminal dimensions if provided
+        if let cols = cols, let rows = rows {
+            _ = try? await client.execute(command: "\(tmuxPath) resize-pane -t '\(session.name)' -x \(cols) -y \(rows)")
+        }
+        
+        // Capture only visible pane without history to avoid column count rewrap issues
+        let output = try await client.execute(command: "\(tmuxPath) capture-pane -t '\(session.name)' -p")
         
         return output
     }

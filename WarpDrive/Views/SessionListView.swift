@@ -10,6 +10,7 @@ struct SessionListView: View {
     @State private var errorMessage: String?
     @State private var selectedSession: TmuxSession?
     @State private var showingSettings = false
+    @State private var hasAutoOpened = false
     
     var body: some View {
         List {
@@ -92,6 +93,15 @@ struct SessionListView: View {
         }
         .task {
             await refreshSessions()
+            #if DEBUG
+            if DebugConfig.autoOpenSession && !hasAutoOpened && !tmuxManager.sessions.isEmpty {
+                hasAutoOpened = true
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                await MainActor.run {
+                    selectedSession = tmuxManager.sessions.first
+                }
+            }
+            #endif
         }
         .alert("New Session", isPresented: $showingNewSession) {
             TextField("Session Name", text: $newSessionName)

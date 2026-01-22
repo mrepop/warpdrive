@@ -34,6 +34,28 @@ struct SettingsView: View {
                     }
                     .padding(.vertical, 4)
                     
+                    Toggle(isOn: $settings.fitToWidthEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Fit Columns to Width")
+                            Text("Auto-size font so exactly N columns fit the screen width.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    if settings.fitToWidthEnabled {
+                        HStack {
+                            Text("Columns")
+                            Spacer()
+                            Picker("Columns", selection: $settings.fitColumns) {
+                                Text("80").tag(80)
+                                Text("100").tag(100)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 160)
+                        }
+                    }
+
                     Text("Adjust the font size for better readability on your device.")
                         .font(.caption)
                         .foregroundColor(.secondary)
